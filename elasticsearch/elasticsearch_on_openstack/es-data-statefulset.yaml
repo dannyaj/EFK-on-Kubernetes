@@ -1,0 +1,60 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  namespace: efk-logging
+  name: es-data
+  labels:
+    component: elasticsearch
+    role: data
+spec:
+  serviceName: "es-data"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: elasticsearch
+        role: data
+    spec:
+      containers:
+      - name: es-data
+        image: elasticsearch:5.2.2
+        securityContext:
+          capabilities:
+            add:
+              - IPC_LOCK
+        args:
+          - -Ecluster.name=k8s-es
+          - -Enode.master=false
+          - -Enode.data=true
+          - -Ehttp.enabled=false
+          - -Enetwork.host=_site_
+          - -Ediscovery.zen.ping.unicast.hosts=elasticsearch-discovery
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: "ES_JAVA_OPTS"
+          value: "-Xms512m -Xmx512m"
+        ports:
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        resources:
+          requests:
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: es-data-pvc
+  volumeClaimTemplates:
+  - metadata:
+      name: es-data-pvc
+    spec:
+      selector:
+        matchLabels:
+          type: es-data-pv
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 50Gi
